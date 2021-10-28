@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="8faf35ea-20ab-4830-aa23-69d2c2e359e9" persistent="false"/>
+	<sftp:config name="SFTP_Config" doc:name="SFTP Config" doc:id="6010b24d-0200-4742-a3d1-ce0d6a8ee588" >
+		<sftp:connection host="192.168.29.12" username="tester" password="password"/>
+	</sftp:config>
+	<flow name="SchedulerAPP" doc:id="a6f5d697-2904-456d-b818-2206df5386a7" >
+		<scheduler doc:name="Scheduler" doc:id="03e64d87-c7ed-4e4d-830f-104c63c7d296" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="First Schdeular Flow" doc:id="a356548d-313f-4fe3-b2b2-81bee4b3e999" message='#["Started Main flow"]'/>
+		<os:retrieve doc:name="Retrieve" doc:id="b50aa827-376c-4640-96df-9da95247c199" key="min" objectStore="Object_store">
+			<os:default-value ><![CDATA[#[1]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="0afea826-c41c-4c58-8ad5-5cd95a3c0eb1" variableName="time"/>
+		<choice doc:name="Choice" doc:id="63eae3db-21a5-4680-9fbf-11e1d202eea4" >
+			<when expression="#[((vars.time as Number) mod 3) == 0]">
+				<flow-ref doc:name="Flow Reference" doc:id="3217f113-bd41-4dac-8b1a-6c007bf0fe3f" name="PartnerA" />
+			</when>
+			<when expression="#[((vars.time as Number) mod 1) == 0]">
+				<flow-ref doc:name="Flow Reference" doc:id="4997c7de-bbe4-4377-a18a-b62fb45f3e87" name="PartnerB"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="eb70fac2-359e-4751-9250-5d1887c2390a" message='#["Time is " ++ payload as String]'/>
+			</otherwise>
+		</choice>
+		<os:store doc:name="Store" doc:id="95d29256-5576-4d73-8bec-d7fd09a751cf" key="min" objectStore="Object_store">
+			<os:value ><![CDATA[#[(vars.time as Number )+ 1]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Logger" doc:id="52755073-860b-41bd-9ef2-531ee71be92c" message='#[" Main Flow Ends"]'/>
+	</flow>
+	<sub-flow name="PartnerA" doc:id="3b3183cd-187e-45be-b662-e3f75edb9f19" >
+		<logger level="INFO" doc:name="Logger" doc:id="03a46514-9d6d-435c-b1b3-f9f69fd42fa3" message='#["Partner A Started...."]'/>
+		<sftp:read doc:name="Read" doc:id="bb782762-f98c-4ec8-96fe-b6bccd1e3df7" config-ref="SFTP_Config" path="\sourceFiles\partnerA\input\order.xml"/>
+		<http:request method="POST" doc:name="Request" doc:id="accf8f46-8f8b-43e4-99f6-8964cc5a6939" path="/xmltojson" config-ref="Listernr8082" responseTimeout="#[500000]">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"timestamp" : attributes.timestamp
+}]]]></http:query-params>
+		</http:request>
+		<choice doc:name="Choice" doc:id="9e3e6bd5-c021-4334-ac7b-86c53812f6cd" >
+			<when expression="#[attributes.statusCode==200]">
+				<sftp:move doc:name="Move" doc:id="8ae3278e-7fd8-40e3-ab00-3c215b3663e3" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerA/input/order.xml" targetPath="/sourceFiles/partnerA/archive" />
+			</when>
+			<otherwise >
+				<sftp:move doc:name="Move" doc:id="b4713122-1973-4072-b7c2-4dad8e0107e2" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerA/input/order.xml" targetPath="/sourceFiles/partnerA/error" />
+			</otherwise>
+		</choice>
+		<sftp:read doc:name="Read" doc:id="8c33b683-ee2e-403f-92e7-7d9f64a11958" config-ref="SFTP_Config" path="\sourceFiles\partnerA\input\product.csv" />
+		<http:request method="POST" doc:name="Request" doc:id="a995211d-6a5c-4fa9-9767-1441c0afe046" path="/csvtojson" config-ref="Listernr8082" responseTimeout="#[500000]">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"timestamp" : attributes.timestamp
+}]]]></http:query-params>
+		</http:request>
+		  <choice doc:name="Choice" doc:id="a7fb8abc-c3a2-467d-bec1-f27eec22f651">
+			<when expression='#[attributes.statusCode==200]'>
+				<sftp:move doc:name="Move" doc:id="5b0abe30-0942-42a4-9b42-42cea1bdc42e" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerA/input/product.csv" targetPath="/sourceFiles/partnerA/archive" />
+			</when>
+			<otherwise>
+				<sftp:move doc:name="Move" doc:id="ccc910af-5a1e-4ccc-bd76-889f77902bf4" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerA/input/product.csv" targetPath="/sourceFiles/partnerA/error" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="fca1f560-350c-4d40-a388-2b49a65964f3" message='#[" Product File moved Successfully"]'/>  
+	</sub-flow>
+	 <sub-flow name="PartnerB" doc:id="aaf28086-c41f-41f7-b916-0435a1f7d9b0" >
+		<logger level="INFO" doc:name="Logger" doc:id="7be30048-12a1-4673-aaa2-f668808fca33" message='#["Partner B Started...."]'/>
+		<try doc:name="Try" doc:id="c09bdff7-d299-4451-855a-6c372353cf5d" >
+			<sftp:read doc:name="Read" doc:id="f966fef3-579b-4bd2-be4d-ec563f42fa26" config-ref="SFTP_Config" path="\sourceFiles\partnerB\input\order.xml" />
+			<http:request method="POST" doc:name="Request" doc:id="bdaa10ac-223d-4b8a-9f8b-b33455deae86" path="/xmltojson" config-ref="Listernr8082" responseTimeout="#[500000]">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"timestamp" : attributes.timestamp
+}]]]></http:query-params>
+		</http:request>
+			<choice doc:name="Choice" doc:id="e0239355-a8fa-45d1-b601-5746bbb5bbc8">
+			<when expression="#[attributes.statusCode==200]">
+				<sftp:move doc:name="Move" doc:id="e9510b89-096b-4bb6-8bda-6d8442d75da1" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerB/input/order.xml" targetPath="/sourceFiles/partnerB/archive" />
+			</when>
+			<otherwise>
+				<sftp:move doc:name="Move" doc:id="40b60ce3-0cd6-415e-84cc-a52d04576727" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerB/input/order.xml" targetPath="/sourceFiles/partnerB/error" />
+			</otherwise>
+		</choice>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d82dde77-6ed0-421d-8f66-16f265a9ac75" type="ANY">
+					<logger level="INFO" doc:name="Logger" doc:id="b141fd84-95db-4ee3-b590-9a2c8c091f66" message='#["ORDER FILE NOT FOUND &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;"]'/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<try doc:name="Try" doc:id="c01078ee-0bff-4ee4-8508-0aa7aa911820" >
+			<sftp:read doc:name="Read" doc:id="13cd1ad8-cc63-4518-98f9-d828b68879a1" config-ref="SFTP_Config" path="\sourceFiles\partnerB\input\product.csv" />
+			<http:request method="POST" doc:name="Request" doc:id="72f80327-fb14-4fe0-9260-de052f4ef12a" path="/csvtojson" config-ref="Listernr8082" responseTimeout="#[500000]">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"timestamp" : attributes.timestamp
+}]]]></http:query-params>
+		</http:request>
+			<choice doc:name="Choice" doc:id="0f3e0f03-b45f-4e8d-a597-9ec6bd92c5f0">
+			<when expression="#[attributes.statusCode==200]">
+				<sftp:move doc:name="Move" doc:id="6e59f4aa-8d21-41ba-8c28-abd939a151c4" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerB/input/product.csv" targetPath="/sourceFiles/partnerB/archive" />
+			</when>
+			<otherwise>
+				<sftp:move doc:name="Move" doc:id="291139e2-a100-44d1-824a-b29647ffd48f" config-ref="SFTP_Config" sourcePath="/sourceFiles/partnerB/input/product.csv" targetPath="/sourceFiles/partnerB/error" />
+			</otherwise>
+		</choice>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d0de482e-01c9-4a48-93bb-6730812c4c84" >
+					<logger level="INFO" doc:name="Logger" doc:id="c019f03b-37e3-4749-a4d6-868ee52b75d7" message='#["PRODUCT FILE NOT FOUND &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;"]'/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<logger level="INFO" doc:name="Logger" doc:id="3488273a-0577-4522-8f6e-b32d5089c5e7" message='#[" Product File moved Successfully"]'/>  
+	</sub-flow> 
+	
+</mule>

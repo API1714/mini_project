@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<sub-flow name="comman-subflow" doc:id="e5ec1d71-1130-42e4-9b54-d16be44700d3" >
+		<set-variable value="#[attributes.queryParams.timestamp]" doc:name="Set Variable" doc:id="915cf70c-e2ac-442d-a077-801ccaaf61bb" variableName="timestamp"/>
+		  <choice doc:name="Choice" doc:id="87fb7bfc-144f-469a-ad0a-d53586ce3ab6" >
+			<when expression="#[not isEmpty(vars.data)]">
+			<foreach doc:name="For Each" doc:id="731b6bba-5648-49ac-ae8a-1b0229de7d37" collection="#[payload]">
+					<logger level="INFO" doc:name="Logger" doc:id="0b9dfd82-87b1-41b2-9096-da2d72f5b0dc" message="#[payload]" />
+					<db:insert doc:name="Insert" doc:id="80d15ea9-11a9-44be-ad5f-88db8894d711" config-ref="Database_Config">
+						<db:sql><![CDATA[INSERT INTO Orders (productId,productName,shipmentId,pickupAddress,deliveryAddress,deliveryStatus,timestamp)
+VALUES (:productId, :productName, :shipmentId, :pickupAddress, :deliveryAddress, :deliveryStatus,:timestamp)]]></db:sql>
+						<db:input-parameters><![CDATA[#[{productId:payload.order.productId as Number,
+productName:payload.order.productName,
+shipmentId:payload.order.shipmentId as Number,
+pickupAddress:payload.order.pickupAddress,
+deliveryAddress:payload.order.deliveryAddress,
+deliveryStatus:payload.order.deliveryStatus,
+timestamp:vars.timestamp
+}]]]></db:input-parameters>
+					</db:insert>
+
+		
+</foreach>
+		
+
+</when>
+			<otherwise >
+				<foreach>
+					<logger level="INFO" doc:name="Logger" doc:id="eabb3b84-9846-4616-8608-0e2ef2944453" message="#[payload]" />
+					 <db:insert doc:name="Insert" doc:id="0824f9b5-8d62-43dd-9ac6-4855d35a1951" config-ref="Database_Config">
+						<db:sql><![CDATA[INSERT INTO Products (productName,sellerName,sellerAddress,timestamp)
+VALUES (:productName, :sellerName, :sellerAddress, :timestamp)]]></db:sql>
+						<db:input-parameters><![CDATA[#[{productName:payload.productName,
+sellerName:payload.sellerName,
+sellerAddress:payload.sellerAddress,
+timestamp:vars.timestamp}]]]></db:input-parameters>
+					</db:insert>  
+
+			
+			</foreach>
+			
+</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="055120a1-c5e9-4c59-8818-69f0cee658bd" message='#["Data Inserted ......."]'/>
+	
+</sub-flow> 
+<flow name="testFlow" doc:id="1ab207ea-0692-4798-aefb-bda711b9c08e" >
+		<db:listener doc:name="On Table Row" doc:id="e9d28aae-af46-41d7-84c6-4dd1d6981aa9" config-ref="Database_Config" table="Orders" watermarkColumn="orderId" idColumn="orderId">
+			<scheduling-strategy >
+				<fixed-frequency frequency="5" timeUnit="SECONDS" startDelay="10"/>
+			</scheduling-strategy>
+		</db:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="c3d33dd3-69f1-43f0-8183-22f1689cc946" message='#["Order database triggered ..."]'/>
+		<set-variable value="#[payload.orderId]" doc:name="Set Variable" doc:id="db3e5f1a-55b1-4049-8e64-543a5ae1ae61" variableName="Order_id"/>
+		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="91b7902f-9871-4fc0-bd4b-b3931d0b8e20" >
+			<ee:transform doc:name="Transform Message" doc:id="c5301ba4-840b-4bc9-85b9-deca36670d63">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	productId__c: payload.productId,
+	orderId__c: payload.orderId,
+	productName__c: payload.productName,
+	shipmentId__c: payload.shipmentId,
+	pickupAddress__c: payload.pickupAddress,
+	deliveryAddress__c: payload.deliveryAddress,
+	deliveryStatus__c: payload.deliveryStatus
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<salesforce:upsert objectType="Order_detail__c" externalIdFieldName="Id" doc:name="Upsert" doc:id="6306a6cb-1ac6-4762-b75c-ae70ce70049a" config-ref="Salesforce_Config" />
+			<logger level="INFO" doc:name="Logger" doc:id="b595a321-c99b-4f02-8db7-e628a0896591" message="#[output application/json 
+&#10;---
+&#10;payload]" />
+		</until-successful>
+<choice doc:name="Choice" doc:id="381723ea-7d7d-4aac-be23-073fa6b7e919" >
+			<when expression="#[payload.successful == false]">
+				<db:delete doc:name="Delete" doc:id="8449dc68-43c9-444b-9707-615373aba6e7" config-ref="Database_Config">
+					<db:sql ><![CDATA[Delete from Orders where orderId = :id]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+id:vars.Order_id
+}]]]></db:input-parameters>
+				</db:delete>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="102eeb8a-6a05-46aa-8a72-41b13a4b5069" message="#[payload]"/>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="720dd90f-c97a-4ede-8d55-658266d935fc" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:RETRY_EXHAUSTED, SALESFORCE:TIMEOUT">
+				<logger level="INFO" doc:name="Logger" doc:id="bf07401a-fa59-436e-8f07-2c856494a588" message="#[error.description]"/>
+			</on-error-propagate>
+		</error-handler>
+	
+</flow>
+	<flow name="testFlow1" doc:id="b99dc869-29a4-46f7-b9be-3d79e0edc656" >
+		<db:listener table="Products" doc:name="On Table Row" doc:id="d7496bed-613a-420e-906a-2e8317309561" config-ref="Database_Config" watermarkColumn="productId" idColumn="productId">
+			<scheduling-strategy >
+				<fixed-frequency frequency="6" timeUnit="SECONDS" startDelay="15"/>
+			</scheduling-strategy>
+		</db:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="f4c1e4ea-e843-42f8-8ae5-d35579581d6b" message='#["Product database triggered ..."]'/>
+		<set-variable value="#[payload.productId]" doc:name="Set Variable" doc:id="3c6c0d70-34d2-40b1-828b-739452f8d382" variableName="productId"/>
+		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="d2fffcee-87c9-450f-9401-bc2e01e744f8" >
+			<ee:transform doc:name="Transform Message" doc:id="dd81494e-016b-46a9-b41c-a590ef6e20f4">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	productId__c: payload.productId,
+	productName__c: payload.productName,
+	sellerName__c: payload.sellerName,
+	sellerAddress__c: payload.sellerAddress
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<salesforce:upsert doc:name="Upsert" doc:id="049b3f30-692c-405b-91d7-b85101ae99ff" config-ref="Salesforce_Config" objectType="Product_detail__c" externalIdFieldName="Id" />
+			<logger level="INFO" doc:name="Logger" doc:id="8002d3ba-8cd1-4cf5-9d25-324ef35f937e" message="#[output application/json 
+&#10;---
+&#10;payload]" />
+		</until-successful>
+		<choice doc:name="Choice" doc:id="8af10622-5eb0-4128-aff4-d83b4c884bc4" >
+			<when expression="#[payload.successful == false]">
+				<db:delete doc:name="Delete" doc:id="302171bd-b9e4-4ce8-a191-50538163bdd9" config-ref="Database_Config">
+					<db:sql ><![CDATA[Delete from Products where productId = :id]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+id:vars.productId
+}]]]></db:input-parameters>
+				</db:delete>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="4de61b04-63e3-4386-af67-d0f8995376e3" message="#[payload]"/>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d4ba6220-28af-4c30-b8ab-e73363abce4d" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:RETRY_EXHAUSTED, SALESFORCE:TIMEOUT">
+				<logger level="INFO" doc:name="Logger" doc:id="c9c7112a-3058-4b92-abc5-6379bb3e4e55" message="#[error.description]"/>
+			</on-error-propagate>
+		</error-handler>
+	
+</flow>
+</mule>

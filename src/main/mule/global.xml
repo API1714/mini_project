@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<http:listener-config name="8082" doc:name="HTTP Listener config" doc:id="55620929-6017-472b-8081-bc778ad3b1a5" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<http:request-config name="Listernr8082" doc:name="HTTP Request configuration" doc:id="4a776b91-ac47-4d37-9a1f-74e9c8a64211" >
+		<http:request-connection host="localhost" port="8082" />
+	</http:request-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="f21b08d1-cce6-4c77-98bd-030536044e70" >
+		<db:my-sql-connection host="remotemysql.com" port="3306" user="2noQhonMwa" password="4stZjsUk8N" database="2noQhonMwa" />
+	</db:config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="9670c33d-8d86-4529-8669-6d9f347b3697" >
+		<salesforce:basic-connection username="suraj.k.nayak@apisero.com" password="Suraj@0206" securityToken="K9SK1J3l5ovFy90Wg9cw7bTG" />
+	</salesforce:sfdc-config>
+	<http:listener-config name="8081" doc:name="HTTP Listener config" doc:id="a4a44f24-32ef-44fc-bcf9-bf9b98cdae3c" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+</mule>

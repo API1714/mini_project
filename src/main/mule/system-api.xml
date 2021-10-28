@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<flow name="XML-Intake-Flow" doc:id="7a6107f0-765a-400e-b874-c0ede6aee68b" >
+		<http:listener doc:name="Listener" doc:id="3d1935c2-5afd-46f3-8fc5-903dae491ed6" path="/xmltojson" allowedMethods="POST" config-ref="8082">
+		</http:listener>
+		<ee:transform doc:name="Transform Message" doc:id="ace493ec-32f7-489a-a39d-9d5392f9962e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.orders]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="orders" doc:name="Set Variable" doc:id="d4d40849-3f80-41d8-81bf-f4e178863ca3" variableName="data"/>
+		<logger level="INFO" doc:name="Logger" doc:id="46333cf5-035e-402a-acfd-10e93a0d6ff4" message='#["xml flow"]'/>
+		<flow-ref doc:name="Flow Reference" doc:id="3c171bda-2b1c-492a-9f7b-1f8a010e81bd" name="comman-subflow"/>
+		<set-variable value="#[vars.orderStatus]" doc:name="Set Variable" doc:id="c81a3db1-3922-4879-9a47-821532bd4696" variableName="httpStatus"/>
+	
+</flow>
+	<flow name="CSV-Intake-Flow" doc:id="33e9fefc-8d06-4461-9e48-d22c88e247e4" >
+		<http:listener doc:name="Listener" doc:id="66a45f19-e83c-4d89-b852-55695ce0cef8" path="/csvtojson" allowedMethods="POST" config-ref="8082">
+		</http:listener>
+		<ee:transform doc:name="Transform Message" doc:id="ff69ab58-60d2-42bb-8e77-281ff2345d92" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="cedf896f-c7c3-4912-b561-47119e767c0f" message='#["csv flow"]'/>
+		<flow-ref doc:name="Flow Reference" doc:id="ed767642-128f-4758-9f1f-cc3072229e58" name="comman-subflow"/>
+	
+</flow>
+	</mule>
